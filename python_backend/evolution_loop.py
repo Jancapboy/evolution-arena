@@ -174,13 +174,13 @@ async def run_evolution(
         else:
             high_fitness_streak = 0
         
-        # 条件B: 停滞检测
-        if species.fitness <= last_fitness:
+        # 条件B: 停滞检测 —— 连续N代fitness变化<5分才算停滞
+        fitness_change = abs(species.fitness - last_fitness)
+        if fitness_change < 5.0:
             stagnation_count += 1
             if stagnation_count >= stagnation_limit:
-                # 触发强制大变异
                 if progress_callback:
-                    progress_callback(species, f"Generation {gen}: 停滞检测，强制大变异！")
+                    progress_callback(species, f"Generation {gen}: 停滞检测(变化{fitness_change:.1f}分)，强制大变异！")
                 stagnation_count = 0
         else:
             stagnation_count = 0

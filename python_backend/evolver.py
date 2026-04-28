@@ -48,7 +48,7 @@ async def mutate(species: Species, diagnosis: str) -> Species:
     5. MUTATE_TEMPERATURE: 调整temperature_gene（0.0-2.0）
     6. CHANGE_MIND_MODEL: 改变agent的认知模式（必须从上面的列表选）
     
-    诊断指导：
+    诊断指导（关键规则）：
     - 如果诊断说"某个agent输出不清晰" → MUTATE_PROMPT重写该agent的提示词
     - 如果诊断说"缺少某个能力" → ADD_AGENT新增专门agent
     - 如果诊断说"某个agent过于严格/宽松" → MUTATE_TEMPERATURE调整
@@ -56,12 +56,21 @@ async def mutate(species: Species, diagnosis: str) -> Species:
     - 如果诊断说"某步骤缺失" → ADD_AGENT插入中间节点
     - 如果诊断说某个agent是瓶颈 → CHANGE_MIND_MODEL更换其认知模式
     
+    **搜索数据相关诊断（重要）：**
+    - 如果诊断说"搜索数据不足/为空" → 检查retriever/pattern_matcher的tools是否包含sql_query，如没有则CHANGE_MIND_MODEL改为retriever并添加sql_query工具
+    - 如果诊断说"有数据但未有效利用" → MUTATE_PROMPT让该agent明确要求"引用search_results.cases中的具体案例"和"使用search_results.key_metrics中的量化指标"
+    - 如果诊断说"数据引用不充分" → 检查retriever的prompt是否明确要求引用search_results，如果没有则MUTATE_PROMPT添加引用要求
+    - 如果诊断说"generator未遵循搜索数据" → MUTATE_PROMPT让generator明确要求"基于search_results中的数据生成方案，不得编造与搜索数据矛盾的内容"
+    - 如果诊断说"缺乏量化指标" → MUTATE_PROMPT让retriever明确要求"从search_results中提取所有量化指标，整理为key-value格式输出"
+    - 如果诊断说"缺乏行业案例" → MUTATE_PROMPT让retriever明确要求"从search_results.cases中提取至少3个具体案例，包含公司名称和效果数据"
+    
     重要规则：
     - generation必须+1
     - 保留history并追加新条目（记录本代变异原因）
     - agents数量保持在2-6之间
     - 拓扑必须仍然是DAG（不能形成环）
     - mind_model必须从限定列表中选择
+    - retriever/pattern_matcher 必须配置 ["sql_query"] 工具（系统会自动搜索互联网获取真实数据）
     - 返回完整的Species JSON
     - history新条目的bottleneck字段要记录具体变异原因
     """

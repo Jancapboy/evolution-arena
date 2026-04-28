@@ -74,6 +74,15 @@ GENESIS_SYSTEM_PROMPT = """你是一位AI架构进化师。你的任务是根据
 2. 拓扑必须是有向无环图（DAG），从input_gate开始，到output_gate结束
 3. 每个Agent的prompt_gene必须具体、可执行
 4. temperature_gene根据角色设定：分析型0.1-0.3，创造型0.7-0.9，批判型0.2-0.4
+5. **工具配置规则**：
+   - retriever/pattern_matcher 必须配置 ["sql_query"] 工具（系统会自动通过Tavily搜索互联网获取真实数据）
+   - generator 可配置 ["python_exec"] 用于代码生成
+   - 其他agent一般不配置工具
+6. **retriever的prompt设计要点**：
+   - 不要写"从互联网检索"或"搜索外部数据源"，因为系统已自动完成搜索
+   - 输入数据中会有 search_results 字段，包含已结构化的真实数据
+   - 任务是基于 search_results 中的案例和指标，进行分析和整理
+   - 输出应引用 search_results.cases 中的具体案例和 search_results.key_metrics 中的量化数据
 
 返回严格JSON格式：
 {
@@ -82,15 +91,25 @@ GENESIS_SYSTEM_PROMPT = """你是一位AI架构进化师。你的任务是根据
       "id": "a1",
       "mind_model": "decomposer",
       "prompt_gene": "你是拆解专家...",
-      "tools": ["sql_query"],
+      "tools": [],
       "input_schema": ["raw_goal"],
       "output_schema": ["metrics_list"],
+      "temperature_gene": 0.2
+    },
+    {
+      "id": "a2",
+      "mind_model": "retriever",
+      "prompt_gene": "基于上游拆解的指标和已注入的search_results数据，分析每个指标对应的行业案例和量化效果。引用search_results中的具体案例和公司名称，整理成结构化报告。",
+      "tools": ["sql_query"],
+      "input_schema": ["metrics_list"],
+      "output_schema": ["case_report"],
       "temperature_gene": 0.2
     }
   ],
   "topology": [
     {"from": "input_gate", "to": "a1", "trigger": "always"},
-    {"from": "a1", "to": "output_gate", "trigger": "always"}
+    {"from": "a1", "to": "a2", "trigger": "always"},
+    {"from": "a2", "to": "output_gate", "trigger": "always"}
   ]
 }"""
 

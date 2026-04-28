@@ -60,6 +60,14 @@ async def genesis(user_goal: str) -> Species:
             temperature_gene=agent_data.get("temperature_gene", 0.5)
         ))
     
+    # 后处理：确保 retriever/pattern_matcher 有搜索工具
+    search_minds = {"retriever", "pattern_matcher"}
+    for agent in agents:
+        if agent.mind_model.value in search_minds:
+            if "sql_query" not in agent.tools:
+                agent.tools.append("sql_query")
+                print(f"[Genesis] 自动为 {agent.id}({agent.mind_model.value}) 添加 sql_query 工具")
+    
     topology = []
     for edge_data in topology_data:
         topology.append(TopologyEdge(
