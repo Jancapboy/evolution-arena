@@ -47,7 +47,8 @@ async def execute_agent(agent: Agent, input_data: dict, user_goal: str = "") -> 
     
     # 检查是否需要Tavily搜索
     tools = agent.tools or []
-    has_web_search = any(t in tools for t in ["web_search", "tavily", "search"])
+    has_web_search = any(t in tools for t in ["web_search", "tavily", "search", "sql_query"])
+    # 注: sql_query 对 retriever 来说本质也是数据检索，系统无真实SQL时映射到 Tavily
     
     search_context = ""
     if has_web_search and TAVILY_AVAILABLE and os.environ.get("TAVILY_API_KEY"):

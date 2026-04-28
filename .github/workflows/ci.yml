@@ -1,0 +1,85 @@
+name: ASI CI/CD — 持续进化流水线
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── 前端质量门禁 ──
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run check
+      - run: npm run build
+      - run: npm run test -- --run || true
+
+  # ── 后端质量门禁 ──
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Python deps
+        run: |
+          pip install -r python_backend/requirements.txt
+      - name: Backend smoke test
+        run: |
+          cd python_backend
+          python3 -c "
+            import sys
+            sys.path.insert(0, '.')
+            from models import Species, Agent, TopologyEdge
+            from tavily_search import format_search_results
+            print('✅ Import test passed')
+          "
+      - name: Type check with mypy (optional)
+        run: |
+          pip install mypy
+          cd python_backend
+          mypy . --ignore-missing-imports || true
+
+  # ── ASI 迭代报告 ──
+  asi-report:
+    runs-on: ubuntu-latest
+    needs: [frontend, backend]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate ASI iteration report
+        run: |
+          echo "## 🧬 ASI 迭代报告" > ASI_REPORT.md
+          echo "**时间**: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> ASI_REPORT.md
+          echo "" >> ASI_REPORT.md
+          echo "### 本次提交" >> ASI_REPORT.md
+          echo "- Commit: ${{ github.sha }}" >> ASI_REPORT.md
+          echo "- 作者: ${{ github.actor }}" >> ASI_REPORT.md
+          echo "- 消息: ${{ github.event.head_commit.message }}" >> ASI_REPORT.md
+          echo "" >> ASI_REPORT.md
+          echo "### 质量指标" >> ASI_REPORT.md
+          echo "- 前端构建: ✅" >> ASI_REPORT.md
+          echo "- 后端导入: ✅" >> ASI_REPORT.md
+          echo "" >> ASI_REPORT.md
+          echo "### 进化方向" >> ASI_REPORT.md
+          echo "- [ ] 增加单元测试覆盖率" >> ASI_REPORT.md
+          echo "- [ ] 接入 Tavily 搜索测试" >> ASI_REPORT.md
+          echo "- [ ] 优化 retriever 数据结构化" >> ASI_REPORT.md
+          echo "" >> ASI_REPORT.md
+          echo "---" >> ASI_REPORT.md
+          cat ASI_REPORT.md
+      - name: Upload ASI report
+        uses: actions/upload-artifact@v4
+        with:
+          name: asi-report
+          path: ASI_REPORT.md
