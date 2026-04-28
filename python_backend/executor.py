@@ -9,6 +9,13 @@ from typing import Any
 from models import Species, Agent, TopologyEdge
 from deepseek_client import call_deepseek, EXECUTOR_SYSTEM_PROMPT_TEMPLATE
 
+# 尝试导入 Tavily 搜索（可选依赖）
+try:
+    from tavily_search import search_and_format
+    TAVILY_AVAILABLE = True
+except ImportError:
+    TAVILY_AVAILABLE = False
+
 
 class ExecutionContext:
     """执行上下文 —— 保存每个Agent的输出，供下游使用"""
@@ -35,16 +42,53 @@ class ExecutionContext:
         return inputs
 
 
-async def execute_agent(agent: Agent, input_data: dict) -> dict:
-    """执行单个Agent，调用DeepSeek API"""
+async def execute_agent(agent: Agent, input_data: dict, user_goal: str = "") -> dict:
+    """执行单个Agent，调用DeepSeek API。如果agent配置了web_search工具，先通过Tavily获取真实数据。"""
+    
+    # 检查是否需要Tavily搜索
+    tools = agent.tools or []
+    has_web_search = any(t in tools for t in ["web_search", "tavily", "search"])
+    
+    search_context = ""
+    if has_web_search and TAVILY_AVAILABLE and os.environ.get("TAVILY_API_KEY"):
+        # 构建搜索查询：优先用agent的prompt意图 + user_goal
+        search_query = user_goal or ""
+        # 如果input_data里有明确的搜索词，也用
+        if isinstance(input_data, dict):
+            for key in ["query", "topic", "search_term", "raw_goal"]:
+                if key in input_data and input_data[key]:
+                    search_query = str(input_data[key])
+                    break
+        
+        try:
+            print(f"[Tavily] Agent {agent.id} 正在搜索: {search_query[:100]}...")
+            search_context = await search_and_format(
+                query=search_query,
+                search_depth="advanced",
+                max_results=5,
+                include_answer=True
+            )
+            print(f"[Tavily] 搜索完成，获取 {len(search_context)} 字符上下文")
+        except Exception as e:
+            print(f"[Tavily] 搜索失败: {e}")
+            search_context = f"[搜索服务暂不可用: {e}]"
+    
     # 构建执行提示词
     input_json = json.dumps(input_data, ensure_ascii=False, indent=2)
     
-    prompt = EXECUTOR_SYSTEM_PROMPT_TEMPLATE.format(
-        mind_model=agent.mind_model.value,
-        prompt_gene=agent.prompt_gene,
-        input_data=input_json
-    )
+    # 如果有搜索上下文，注入到prompt中
+    if search_context:
+        prompt = EXECUTOR_SYSTEM_PROMPT_TEMPLATE.format(
+            mind_model=agent.mind_model.value,
+            prompt_gene=agent.prompt_gene + f"\n\n[重要: 以下是通过Tavily搜索获取的真实互联网数据，请基于这些数据作答，不要编造引用]\n\n{search_context}",
+            input_data=input_json
+        )
+    else:
+        prompt = EXECUTOR_SYSTEM_PROMPT_TEMPLATE.format(
+            mind_model=agent.mind_model.value,
+            prompt_gene=agent.prompt_gene,
+            input_data=input_json
+        )
     
     try:
         result = await call_deepseek(
@@ -126,8 +170,8 @@ async def execute_generation(species: Species) -> Species:
         # 收集输入
         input_data = context.get_input_for_agent(agent, species.topology)
         
-        # 执行Agent
-        output = await execute_agent(agent, input_data)
+        # 执行Agent（传入user_goal用于搜索）
+        output = await execute_agent(agent, input_data, species.user_goal)
         
         # 存储输出
         context.set_output(agent.id, output)

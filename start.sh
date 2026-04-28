@@ -1,4 +1,3 @@
-#!/bin/bash
 # 进化竞技场启动脚本
 # 同时启动Python后端和前端开发服务器
 
@@ -10,6 +9,12 @@ if [ -z "$DEEPSEEK_API_KEY" ]; then
     echo "⚠️  警告: DEEPSEEK_API_KEY 环境变量未设置"
     echo "   请设置后重新启动: export DEEPSEEK_API_KEY=your_key_here"
     echo ""
+fi
+
+# 设置 Tavily API Key（用于真实搜索）
+if [ -z "$TAVILY_API_KEY" ]; then
+    export TAVILY_API_KEY="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"
+    echo "🔍 Tavily API Key 已自动设置"
 fi
 
 # 启动Python后端（后台）
