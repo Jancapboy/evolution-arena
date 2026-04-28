@@ -39,7 +39,7 @@ async def evaluate(species: Species, context) -> Species:
     {execution_text}
     
     最终结果：
-    {result_text[:3000]}  # 截断避免过长
+    {result_text[:5000]}  # 截断避免过长，但增加到5000字符
     
     Agent拓扑：
     {json.dumps([{"id": a.id, "mind_model": a.mind_model.value, "prompt": a.prompt_gene[:100]} for a in species.agents], ensure_ascii=False)}
@@ -49,9 +49,11 @@ async def evaluate(species: Species, context) -> Species:
     2. 完整性：是否覆盖用户目标的所有方面  
     3. 可执行性：如果是代码，能否直接运行；如果是方案，能否落地
     
+    **重要提醒**：所有Agent都基于AI内部知识工作，不涉及实时联网搜索。评估时应关注逻辑自洽性和知识综合质量，不要求提供可验证的外部引用（如DOI、URL等）。
+    
     同时指出：
     - 最弱的环节是哪个Agent（weak_point）
-    - 具体诊断（diagnosis）：为什么弱，怎么改进
+    - 具体诊断（diagnosis）：为什么弱，怎么改进。如果问题是agent被分配了超出其能力的任务，明确指出应该更换其mind_model或调整prompt_gene。
     """
     
     try:

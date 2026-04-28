@@ -28,10 +28,18 @@ async def genesis(user_goal: str) -> Species:
     请设计一个Agent协作系统来完成这个目标。
     要求：
     1. 3-5个Agent，每个有明确的认知分工
-    2. 拓扑必须是DAG，数据从input_gate流入，从output_gate流出
-    3. Agent的prompt_gene必须包含具体的任务指令和约束
-    4. 如果任务涉及代码生成，给对应agent配置"python_exec"工具
-    5. 如果任务涉及数据分析，给对应agent配置"sql_query"或"data_analysis"工具
+    2. **认知模式定义（严格遵守）**：
+       - `retriever` = 综合已知信息，提取行业概念和知识，不是实时联网搜索
+       - `generator` = 创造性生成、模拟、预测
+       - `decomposer` = 拆解复杂目标为子任务
+       - `critic` = 评估审查
+       - `validator` = 验证逻辑一致性
+       - `optimizer` = 优化精炼
+    3. 拓扑必须是DAG，数据从input_gate流入，从output_gate流出
+    4. Agent的prompt_gene必须包含具体的任务指令和约束
+    5. **禁止要求agent"从互联网检索"或"提供DOI/URL引用"，所有agent基于AI内部知识工作**
+    6. 如果任务涉及代码生成，给对应agent配置"python_exec"工具
+    7. 如果任务涉及数据分析，给对应agent配置"sql_query"或"data_analysis"工具
     
     返回严格JSON格式。
     """
