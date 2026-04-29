@@ -16,7 +16,7 @@ import {
   Trash2,
   Download,
 } from "lucide-react";
-import { listSpecies, deleteSpecies, exportSpecies, type SpeciesData } from "@/hooks/useApi";
+import { listSpecies, deleteSpecies, exportSpecies, importSpecies, type SpeciesData } from "@/hooks/useApi";
 
 export default function SpeciesList() {
   const navigate = useNavigate();
@@ -111,6 +111,24 @@ export default function SpeciesList() {
     }
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      // 支持导出格式 { data: {...} } 或直接的物种对象
+      const speciesData = json.data || json;
+      await importSpecies(speciesData);
+      alert(`导入成功: ${speciesData.species_id}`);
+      load();
+    } catch (err: any) {
+      alert("导入失败: " + err.message);
+    } finally {
+      e.target.value = "";
+    }
+  };
+
   const getFitnessColor = (fitness: number) => {
     if (fitness >= 80) return "#00e676";
     if (fitness >= 50) return "#ffd600";
@@ -161,26 +179,63 @@ export default function SpeciesList() {
             </div>
           </div>
 
-          <button
-            onClick={() => navigate("/arena")}
-            style={{
-              padding: "10px 18px",
-              background: "#00f5ff15",
-              border: "1px solid #00f5ff50",
-              borderRadius: 8,
-              color: "#00f5ff",
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              transition: "all 0.2s",
-            }}
-          >
-            <Plus size={14} />
-            创建新物种
-          </button>
+          <div style={{ display: "flex", gap: 10 }}>
+            <input
+              type="file"
+              id="import-json"
+              accept=".json"
+              onChange={handleImport}
+              style={{ display: "none" }}
+            />
+            <button
+              onClick={() => document.getElementById("import-json")?.click()}
+              style={{
+                padding: "10px 18px",
+                background: "#14141f",
+                border: "1px solid #2a2a3e",
+                borderRadius: 8,
+                color: "#888",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#00f5ff50";
+                e.currentTarget.style.color = "#00f5ff";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "#2a2a3e";
+                e.currentTarget.style.color = "#888";
+              }}
+            >
+              <Download size={14} />
+              导入JSON
+            </button>
+            <button
+              onClick={() => navigate("/arena")}
+              style={{
+                padding: "10px 18px",
+                background: "#00f5ff15",
+                border: "1px solid #00f5ff50",
+                borderRadius: 8,
+                color: "#00f5ff",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                transition: "all 0.2s",
+              }}
+            >
+              <Plus size={14} />
+              创建新物种
+            </button>
+          </div>
         </div>
 
         {/* 统计概览 */}

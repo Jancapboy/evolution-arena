@@ -233,6 +233,37 @@ async def export_species(species_id: str):
     }
 
 
+@app.post("/api/species/import")
+async def import_species(body: dict):
+    """
+    导入物种——从JSON恢复基因库
+    """
+    try:
+        data = body.get("data") or body
+        if not data or not isinstance(data, dict):
+            raise HTTPException(status_code=400, detail="缺少导入数据")
+
+        # 必要字段检查
+        required = ["species_id", "user_goal", "agents", "topology"]
+        missing = [f for f in required if f not in data]
+        if missing:
+            raise HTTPException(status_code=400, detail=f"缺少字段: {', '.join(missing)}")
+
+        species = Species.model_validate(data)
+        save_species(species)
+
+        return {
+            "imported": True,
+            "species_id": species.species_id,
+            "generation": species.generation,
+            "status": species.status,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"导入失败: {str(e)}")
+
+
 @app.get("/api/species/{species_id}/events")
 async def species_events(species_id: str):
     """
