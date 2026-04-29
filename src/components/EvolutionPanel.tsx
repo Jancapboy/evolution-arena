@@ -374,6 +374,66 @@ export default function EvolutionPanel({
           </div>
         )}
 
+        {/* 结果与诊断 */}
+        {species && (species.latest_result || species.latest_diagnosis) && (
+          <div style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                fontSize: 10,
+                color: "#666",
+                textTransform: "uppercase",
+                letterSpacing: 2,
+                marginBottom: 12,
+                fontWeight: 600,
+              }}
+            >
+              Result / 结果与诊断
+            </div>
+            <div
+              style={{
+                background: "#14141f",
+                border: "1px solid #1a1a2e",
+                borderRadius: 10,
+                padding: "14px 16px",
+              }}
+            >
+              {species.latest_result && (
+                <div style={{ marginBottom: 12 }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "#555",
+                      marginBottom: 6,
+                      fontWeight: 600,
+                    }}
+                  >
+                    最新结果
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "#bbb",
+                      lineHeight: 1.6,
+                      maxHeight: 120,
+                      overflow: "auto",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      background: "#0d0d14",
+                      borderRadius: 6,
+                      padding: "8px 10px",
+                    }}
+                  >
+                    {species.latest_result}
+                  </div>
+                </div>
+              )}
+              {species.latest_diagnosis && (
+                <DiagnosisBlock diagnosis={species.latest_diagnosis} />
+              )}
+            </div>
+          </div>
+        )}
+
         {/* 进化控制 */}
         {species && (
           <div style={{ marginBottom: 28 }}>
@@ -759,6 +819,79 @@ export default function EvolutionPanel({
         }}
       >
         闭环自进化系统 v1.0
+      </div>
+    </div>
+  );
+}
+
+function DiagnosisBlock({ diagnosis }: { diagnosis: string }) {
+  let parsed: any = null;
+  try {
+    parsed = JSON.parse(diagnosis);
+  } catch {
+    // 不是JSON，当普通文本显示
+  }
+
+  if (parsed && typeof parsed === "object") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {parsed.diagnosis && (
+          <div>
+            <div style={{ fontSize: 10, color: "#555", marginBottom: 4, fontWeight: 600 }}>
+              诊断
+            </div>
+            <div style={{ fontSize: 11, color: "#aaa", lineHeight: 1.5 }}>
+              {parsed.diagnosis}
+            </div>
+          </div>
+        )}
+        {parsed.weak_point && (
+          <div
+            style={{
+              background: "#2a0a0a",
+              border: "1px solid #ff174430",
+              borderRadius: 6,
+              padding: "6px 8px",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 11,
+              color: "#ff6b6b",
+            }}
+          >
+            <AlertTriangle size={12} />
+            薄弱环节: {parsed.weak_point}
+          </div>
+        )}
+        {parsed.suggestion && (
+          <div>
+            <div style={{ fontSize: 10, color: "#555", marginBottom: 4, fontWeight: 600 }}>
+              建议
+            </div>
+            <div style={{ fontSize: 11, color: "#888", lineHeight: 1.5 }}>
+              {parsed.suggestion}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: "#555", marginBottom: 4, fontWeight: 600 }}>
+        诊断信息
+      </div>
+      <div
+        style={{
+          fontSize: 11,
+          color: "#aaa",
+          lineHeight: 1.5,
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+        }}
+      >
+        {diagnosis}
       </div>
     </div>
   );
