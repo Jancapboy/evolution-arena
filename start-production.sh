@@ -7,12 +7,24 @@ set -e
 echo "🧬 Evolution Arena 生产模式启动中..."
 echo ""
 
+# 加载环境配置
+if [ -f "python_backend/.env" ]; then
+    echo "📝 加载 python_backend/.env..."
+    set -a
+    source python_backend/.env
+    set +a
+fi
+
 # 检查必要环境变量
 if [ -z "$DEEPSEEK_API_KEY" ]; then
     echo "❌ 错误: DEEPSEEK_API_KEY 未设置"
-    echo "   export DEEPSEEK_API_KEY=sk-***"
+    echo "   请在 python_backend/.env 中配置 DEEPSEEK_API_KEY=***"
     exit 1
 fi
+
+echo "✅ API配置: $DEEPSEEK_API_URL"
+echo "   模型: $DEEPSEEK_MODEL"
+echo ""
 
 # 检查Python依赖
 if ! python3 -c "import fastapi" 2>/dev/null; then
