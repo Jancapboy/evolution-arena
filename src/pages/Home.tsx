@@ -183,6 +183,17 @@ export default function SpeciesList() {
           </button>
         </div>
 
+        {/* 统计概览 */}
+        <div
+          style={{
+            maxWidth: 1200,
+            margin: "0 auto",
+            padding: "0 24px 16px",
+          }}
+        >
+          <StatsBar species={species} />
+        </div>
+
         {/* 筛选栏 */}
         <div
           style={{
@@ -518,6 +529,57 @@ export default function SpeciesList() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function StatsBar({ species }: { species: SpeciesData[] }) {
+  const total = species.length;
+  const avgFitness = total > 0
+    ? species.reduce((s, x) => s + x.fitness, 0) / total
+    : 0;
+  const converged = species.filter((s) => s.status === "converged").length;
+  const evolving = species.filter((s) => s.status === "evolving").length;
+  const failed = species.filter((s) => s.status === "failed").length;
+
+  const items = [
+    { label: "总物种", value: total, color: "#fff" },
+    { label: "平均适应度", value: avgFitness.toFixed(1), color: avgFitness >= 80 ? "#00e676" : avgFitness >= 50 ? "#ffd600" : "#ff6b35" },
+    { label: "已收敛", value: converged, color: "#00e676" },
+    { label: "进化中", value: evolving, color: "#ffd600" },
+    { label: "失败", value: failed, color: "#ff1744" },
+  ];
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 12,
+        flexWrap: "wrap",
+      }}
+    >
+      {items.map((item) => (
+        <div
+          key={item.label}
+          style={{
+            background: "#14141f",
+            border: "1px solid #1a1a2e",
+            borderRadius: 8,
+            padding: "10px 16px",
+            display: "flex",
+            alignItems: "baseline",
+            gap: 8,
+            minWidth: 80,
+          }}
+        >
+          <span style={{ fontSize: 16, fontWeight: 700, color: item.color }}>
+            {item.value}
+          </span>
+          <span style={{ fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: 1 }}>
+            {item.label}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
