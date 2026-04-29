@@ -34,6 +34,7 @@ interface EvolutionPanelProps {
   onEvolve: (speciesId: string) => Promise<void>;
   isLoading: boolean;
   liveLog?: { time: number; message: string }[];
+  backendStatus?: "connected" | "disconnected" | "checking";
 }
 
 export default function EvolutionPanel({
@@ -42,6 +43,7 @@ export default function EvolutionPanel({
   onEvolve,
   isLoading,
   liveLog = [],
+  backendStatus = "checking",
 }: EvolutionPanelProps) {
   const [goal, setGoal] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -137,6 +139,7 @@ export default function EvolutionPanel({
           >
             EVOLUTION ARENA
           </span>
+          <StatusDot status={backendStatus} />
         </div>
         <div style={{ fontSize: 11, color: "#555", marginLeft: 30, display: "flex", alignItems: "center", gap: 8 }}>
           <span>闭环自进化Agent系统</span>
@@ -726,6 +729,51 @@ export default function EvolutionPanel({
       >
         闭环自进化系统 v1.0
       </div>
+    </div>
+  );
+}
+
+function StatusDot({ status }: { status: "connected" | "disconnected" | "checking" }) {
+  const color =
+    status === "connected"
+      ? "#00e676"
+      : status === "disconnected"
+      ? "#ff1744"
+      : "#ffd600";
+  const label =
+    status === "connected"
+      ? "后端在线"
+      : status === "disconnected"
+      ? "后端离线"
+      : "检测中";
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        marginLeft: "auto",
+        padding: "2px 8px",
+        background: `${color}15`,
+        border: `1px solid ${color}40`,
+        borderRadius: 12,
+      }}
+      title={label}
+    >
+      <span
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          background: color,
+          boxShadow: `0 0 6px ${color}`,
+          animation: status === "checking" ? "pulse 1.5s infinite" : undefined,
+        }}
+      />
+      <span style={{ fontSize: 9, color, fontWeight: 600, letterSpacing: 0.5 }}>
+        {label}
+      </span>
     </div>
   );
 }

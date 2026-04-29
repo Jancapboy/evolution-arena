@@ -105,3 +105,9 @@ export async function exportSpecies(species_id: string): Promise<Record<string, 
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function checkHealth(): Promise<{ status: string; service: string }> {
+  const res = await fetch(`${API_BASE}/health`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Health check failed");
+  return res.json();
+}

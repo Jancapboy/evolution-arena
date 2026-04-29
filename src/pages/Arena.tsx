@@ -10,6 +10,7 @@ import {
   createSpecies,
   evolveSpecies,
   getSpecies,
+  checkHealth,
   type SpeciesData,
 } from "@/hooks/useApi";
 import { X, AlertTriangle, Cpu, Thermometer, Wrench, FileText } from "lucide-react";
@@ -27,6 +28,7 @@ export default function Arena() {
     tools: string[];
     temperature_gene: number;
   } | null>(null);
+  const [backendStatus, setBackendStatus] = useState<"connected" | "disconnected" | "checking">("checking");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sseRef = useRef<EventSource | null>(null);
 
@@ -145,6 +147,21 @@ export default function Arena() {
     }
   }, []);
 
+  // 后端健康检查 —— 8秒一次，不依speciesId
+  useEffect(() => {
+    const check = async () => {
+      try {
+        await checkHealth();
+        setBackendStatus("connected");
+      } catch {
+        setBackendStatus("disconnected");
+      }
+    };
+    check();
+    const id = setInterval(check, 8000);
+    return () => clearInterval(id);
+  }, []);
+
   // 提取薄弱环节
   const weakPoint = (() => {
     if (!species?.latest_diagnosis) return undefined;
@@ -173,6 +190,7 @@ export default function Arena() {
         onEvolve={handleEvolve}
         isLoading={isLoading}
         liveLog={liveLog}
+        backendStatus={backendStatus}
       />
 
       {/* 右侧拓扑画布 */}
