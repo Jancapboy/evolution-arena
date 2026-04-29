@@ -124,8 +124,22 @@ export default function EvolutionPanel({
             EVOLUTION ARENA
           </span>
         </div>
-        <div style={{ fontSize: 11, color: "#555", marginLeft: 30 }}>
-          闭环自进化Agent系统
+        <div style={{ fontSize: 11, color: "#555", marginLeft: 30, display: "flex", alignItems: "center", gap: 8 }}>
+          <span>闭环自进化Agent系统</span>
+          <span style={{ color: "#2a2a3e" }}>|</span>
+          <a
+            href="/"
+            style={{
+              color: "#00f5ff",
+              textDecoration: "none",
+              fontSize: 10,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            ← 物种库
+          </a>
         </div>
       </div>
 

@@ -1,20 +1,443 @@
-import { useState } from 'react'
-import '../App.css'
+// 物种列表页 —— 进化竞技场的入口
+// 展示所有历史物种，支持搜索、筛选、排序
 
-export default function Home() {
-  const [count, setCount] = useState(0)
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router";
+import {
+  Dna,
+  Search,
+  TrendingUp,
+  Zap,
+  Activity,
+  CheckCircle,
+  AlertTriangle,
+  ArrowRight,
+  Plus,
+  Filter,
+} from "lucide-react";
+import { listSpecies, type SpeciesData } from "@/hooks/useApi";
+
+export default function SpeciesList() {
+  const navigate = useNavigate();
+  const [species, setSpecies] = useState<SpeciesData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"fitness" | "generation" | "recent">("recent");
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await listSpecies();
+      setSpecies(data as SpeciesData[]);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filtered = useMemo(() => {
+    let result = [...species];
+
+    // 搜索
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (s) =>
+          s.species_id.toLowerCase().includes(q) ||
+          s.user_goal.toLowerCase().includes(q)
+      );
+    }
+
+    // 状态筛选
+    if (statusFilter !== "all") {
+      result = result.filter((s) => s.status === statusFilter);
+    }
+
+    // 排序
+    result.sort((a, b) => {
+      if (sortBy === "fitness") return b.fitness - a.fitness;
+      if (sortBy === "generation") return b.generation - a.generation;
+      return 0; // recent: 服务端已按updated_at排序
+    });
+
+    return result;
+  }, [species, search, statusFilter, sortBy]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "converged":
+        return { color: "#00e676", bg: "#00e67615", icon: <CheckCircle size={12} /> };
+      case "evolving":
+        return { color: "#ffd600", bg: "#ffd60015", icon: <Activity size={12} className="animate-pulse" /> };
+      case "failed":
+        return { color: "#ff1744", bg: "#ff174415", icon: <AlertTriangle size={12} /> };
+      default:
+        return { color: "#00f5ff", bg: "#00f5ff15", icon: <Zap size={12} /> };
+    }
+  };
+
+  const getFitnessColor = (fitness: number) => {
+    if (fitness >= 80) return "#00e676";
+    if (fitness >= 50) return "#ffd600";
+    return "#ff6b35";
+  };
 
   return (
-    <>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
+    <div
+      style={{
+        width: "100vw",
+        height: "100vh",
+        background: "#0a0a0f",
+        overflow: "auto",
+        color: "#e0e0e0",
+      }}
+    >
+      {/* 顶部栏 */}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          background: "#0a0a0fcc",
+          backdropFilter: "blur(12px)",
+          borderBottom: "1px solid #1a1a2e",
+          zIndex: 100,
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 1200,
+            margin: "0 auto",
+            padding: "20px 24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 20,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Dna size={22} color="#00f5ff" />
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", letterSpacing: 1 }}>
+                EVOLUTION ARENA
+              </div>
+              <div style={{ fontSize: 10, color: "#555" }}>
+                物种库 · {species.length} 个生命体
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => navigate("/arena")}
+            style={{
+              padding: "10px 18px",
+              background: "#00f5ff15",
+              border: "1px solid #00f5ff50",
+              borderRadius: 8,
+              color: "#00f5ff",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              transition: "all 0.2s",
+            }}
+          >
+            <Plus size={14} />
+            创建新物种
+          </button>
+        </div>
+
+        {/* 筛选栏 */}
+        <div
+          style={{
+            maxWidth: 1200,
+            margin: "0 auto",
+            padding: "0 24px 16px",
+            display: "flex",
+            gap: 12,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          {/* 搜索 */}
+          <div
+            style={{
+              flex: 1,
+              minWidth: 240,
+              position: "relative",
+            }}
+          >
+            <Search
+              size={14}
+              style={{
+                position: "absolute",
+                left: 12,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: "#555",
+              }}
+            />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索 species ID 或目标描述..."
+              style={{
+                width: "100%",
+                padding: "10px 14px 10px 36px",
+                background: "#14141f",
+                border: "1px solid #2a2a3e",
+                borderRadius: 8,
+                color: "#e0e0e0",
+                fontSize: 13,
+                outline: "none",
+                fontFamily: "inherit",
+              }}
+            />
+          </div>
+
+          {/* 状态筛选 */}
+          <div style={{ display: "flex", gap: 6 }}>
+            {[
+              { key: "all", label: "全部" },
+              { key: "evolving", label: "进化中" },
+              { key: "converged", label: "已收敛" },
+              { key: "failed", label: "失败" },
+            ].map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setStatusFilter(f.key)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 6,
+                  border: "1px solid",
+                  borderColor: statusFilter === f.key ? "#00f5ff50" : "#2a2a3e",
+                  background: statusFilter === f.key ? "#00f5ff15" : "#14141f",
+                  color: statusFilter === f.key ? "#00f5ff" : "#666",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  fontWeight: statusFilter === f.key ? 700 : 400,
+                }}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* 排序 */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            style={{
+              padding: "9px 12px",
+              background: "#14141f",
+              border: "1px solid #2a2a3e",
+              borderRadius: 6,
+              color: "#888",
+              fontSize: 12,
+              cursor: "pointer",
+              outline: "none",
+            }}
+          >
+            <option value="recent">最近更新</option>
+            <option value="fitness">适应度</option>
+            <option value="generation">世代数</option>
+          </select>
+        </div>
       </div>
-    </>
-  )
+
+      {/* 内容区 */}
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px" }}>
+        {loading && (
+          <div style={{ textAlign: "center", padding: 80, color: "#555" }}>
+            <Activity size={32} className="animate-pulse" style={{ marginBottom: 16 }} />
+            <div style={{ fontSize: 13 }}>正在加载物种数据...</div>
+          </div>
+        )}
+
+        {error && (
+          <div
+            style={{
+              padding: 40,
+              textAlign: "center",
+              background: "#2a0a0a",
+              border: "1px solid #ff174450",
+              borderRadius: 10,
+              color: "#ff6b6b",
+              fontSize: 13,
+            }}
+          >
+            <AlertTriangle size={24} style={{ marginBottom: 8 }} />
+            <div>加载失败: {error}</div>
+          </div>
+        )}
+
+        {!loading && !error && filtered.length === 0 && (
+          <div style={{ textAlign: "center", padding: 80, color: "#444" }}>
+            <Dna size={48} style={{ marginBottom: 16, opacity: 0.3 }} />
+            <div style={{ fontSize: 14, marginBottom: 8 }}>暂无物种</div>
+            <div style={{ fontSize: 12, color: "#333" }}>
+              点击右上角“创建新物种”开始你的第一个进化实验
+            </div>
+          </div>
+        )}
+
+        {!loading && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
+              gap: 16,
+            }}
+          >
+            {filtered.map((s) => {
+              const st = getStatusColor(s.status);
+              return (
+                <div
+                  key={s.species_id}
+                  onClick={() => navigate(`/arena?id=${s.species_id}`)}
+                  style={{
+                    background: "#14141f",
+                    border: "1px solid #1a1a2e",
+                    borderRadius: 10,
+                    padding: "18px 20px",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "#2a2a3e";
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "#1a1a2e";
+                    e.currentTarget.style.transform = "translateY(0)";
+                  }}
+                >
+                  {/* 头部 */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: "#888",
+                        fontFamily: "monospace",
+                      }}
+                    >
+                      {s.species_id}
+                    </span>
+                    <span
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
+                        fontSize: 11,
+                        color: st.color,
+                        fontWeight: 600,
+                        padding: "3px 8px",
+                        background: st.bg,
+                        borderRadius: 4,
+                      }}
+                    >
+                      {st.icon}
+                      {s.status.toUpperCase()}
+                    </span>
+                  </div>
+
+                  {/* 目标 */}
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "#ccc",
+                      lineHeight: 1.5,
+                      marginBottom: 14,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                    }}
+                  >
+                    {s.user_goal}
+                  </div>
+
+                  {/* 底部数据 */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 16,
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          marginBottom: 4,
+                          fontSize: 10,
+                          color: "#555",
+                        }}
+                      >
+                        <span>适应度</span>
+                        <span style={{ color: getFitnessColor(s.fitness), fontWeight: 700 }}>
+                          {s.fitness.toFixed(1)}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          width: "100%",
+                          height: 3,
+                          background: "#1a1a2e",
+                          borderRadius: 2,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${Math.min(s.fitness, 100)}%`,
+                            height: "100%",
+                            background: getFitnessColor(s.fitness),
+                            borderRadius: 2,
+                            transition: "width 0.5s ease",
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        fontSize: 11,
+                        color: "#666",
+                      }}
+                    >
+                      <TrendingUp size={12} />
+                      GEN {s.generation}
+                    </div>
+
+                    <ArrowRight size={14} color="#444" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
