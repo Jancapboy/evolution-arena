@@ -33,6 +33,7 @@ interface EvolutionPanelProps {
   onCreate: (goal: string) => Promise<void>;
   onEvolve: (speciesId: string) => Promise<void>;
   isLoading: boolean;
+  liveLog?: string[];
 }
 
 export default function EvolutionPanel({
@@ -40,6 +41,7 @@ export default function EvolutionPanel({
   onCreate,
   onEvolve,
   isLoading,
+  liveLog = [],
 }: EvolutionPanelProps) {
   const [goal, setGoal] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -438,6 +440,62 @@ export default function EvolutionPanel({
               >
                 <Download size={14} />
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* 实时日志流 */}
+        {liveLog.length > 0 && (
+          <div style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                fontSize: 10,
+                color: "#666",
+                textTransform: "uppercase",
+                letterSpacing: 2,
+                marginBottom: 12,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Activity size={12} className="animate-pulse" />
+              Live Log / 实时日志
+            </div>
+            <div
+              style={{
+                background: "#14141f",
+                border: "1px solid #1a1a2e",
+                borderRadius: 10,
+                padding: "10px 12px",
+                maxHeight: 160,
+                overflow: "auto",
+                fontFamily: "monospace",
+                fontSize: 10,
+                lineHeight: 1.6,
+              }}
+            >
+              {liveLog.map((msg, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    color: idx === liveLog.length - 1 ? "#00f5ff" : "#777",
+                    padding: "2px 0",
+                    borderBottom:
+                      idx === liveLog.length - 1 ? "none" : "1px solid #1a1a2e",
+                  }}
+                >
+                  <span style={{ color: "#444", marginRight: 6 }}>
+                    {new Date().toLocaleTimeString("zh-CN", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                    })}
+                  </span>
+                  {msg}
+                </div>
+              ))}
             </div>
           </div>
         )}

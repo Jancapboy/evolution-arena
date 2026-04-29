@@ -18,6 +18,7 @@ export default function Arena() {
   const [species, setSpecies] = useState<SpeciesData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liveLog, setLiveLog] = useState<string[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sseRef = useRef<EventSource | null>(null);
 
@@ -49,6 +50,7 @@ export default function Arena() {
     };
 
     fetchSpecies();
+    setLiveLog([]);
 
     // 启动SSE实时推送
     const sse = new EventSource(`/api/species/${speciesId}/events`);
@@ -67,6 +69,14 @@ export default function Arena() {
             status: payload.status ?? prev.status,
           };
         });
+
+        // 收集实时日志
+        if (payload.message) {
+          setLiveLog((prev) => {
+            const next = [...prev, payload.message];
+            return next.slice(-20); // 保留最近20条
+          });
+        }
 
         // 如果进化结束，停止SSE并刷新完整数据
         if (payload.status === "converged" || payload.status === "failed") {
@@ -153,6 +163,7 @@ export default function Arena() {
         onCreate={handleCreate}
         onEvolve={handleEvolve}
         isLoading={isLoading}
+        liveLog={liveLog}
       />
 
       {/* 右侧拓扑画布 */}
