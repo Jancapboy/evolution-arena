@@ -31,6 +31,7 @@ interface TopologyViewerProps {
   topology: TopologyEdge[];
   weakPoint?: string; // 最弱环节高亮
   isEvolving?: boolean; // 是否显示进化动画效果
+  onNodeClick?: (agent: Agent) => void; // 点击节点回调
 }
 
 // 认知模式配色 —— 赛博朋克风格
@@ -57,6 +58,7 @@ export default function TopologyViewer({
   topology,
   weakPoint,
   isEvolving = false,
+  onNodeClick,
 }: TopologyViewerProps) {
   // 计算节点布局 —— 使用简单的分层布局
   const { nodes, edges } = useMemo(() => {
@@ -165,7 +167,7 @@ export default function TopologyViewer({
             ? color.glow + " animation: pulse 2s infinite"
             : color.glow,
           transition: "all 0.5s ease",
-          cursor: "default",
+          cursor: onNodeClick ? "pointer" : "default",
         },
       });
     });
@@ -322,6 +324,11 @@ export default function TopologyViewer({
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
         style={{ background: "#0a0a0f" }}
+        onNodeClick={(_, node) => {
+          if (onNodeClick && node.data?.agent) {
+            onNodeClick(node.data.agent as Agent);
+          }
+        }}
       >
         <Background color="#222" gap={20} size={1} />
         <Controls
