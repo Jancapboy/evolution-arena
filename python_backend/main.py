@@ -5,11 +5,14 @@ FastAPI 主应用 —— 进化系统的外部接口
 import os
 import sys
 import asyncio
+import json
+from datetime import datetime
 from typing import Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 # 将当前目录加入路径
@@ -21,6 +24,12 @@ from evolution_loop import (
     run_evolution, save_species, load_species, 
     list_species, init_db, delete_species
 )
+
+
+# ========== 进化事件流（SSE） ==========
+
+# 存储每个物种的最新进度，供SSE端点推送
+evolution_events: dict[str, dict] = {}
 
 
 # ========== 请求/响应模型 ==========
@@ -104,14 +113,31 @@ async def evolve_species(request: EvolveRequest, background_tasks: BackgroundTas
     
     # 在后台运行进化
     async def run_in_background():
+        def on_progress(species: Species, message: str):
+            evolution_events[request.species_id] = {
+                "species_id": species.species_id,
+                "generation": species.generation,
+                "fitness": species.fitness,
+                "status": species.status,
+                "message": message,
+                "timestamp": datetime.now().isoformat(),
+            }
+        
         try:
             await run_evolution(
                 species_id=request.species_id,
                 max_generations=request.max_generations,
-                fitness_threshold=request.fitness_threshold
+                fitness_threshold=request.fitness_threshold,
+                progress_callback=on_progress
             )
         except Exception as e:
             print(f"进化任务失败: {e}")
+            evolution_events[request.species_id] = {
+                "species_id": request.species_id,
+                "status": "failed",
+                "message": f"失败: {str(e)}",
+                "timestamp": datetime.now().isoformat(),
+            }
     
     background_tasks.add_task(run_in_background)
     
@@ -207,7 +233,31 @@ async def export_species(species_id: str):
     }
 
 
-from datetime import datetime
+@app.get("/api/species/{species_id}/events")
+async def species_events(species_id: str):
+    """
+    SSE实时推送进化进度
+    """
+    async def event_generator():
+        last_data = None
+        while True:
+            data = evolution_events.get(species_id)
+            if data and data != last_data:
+                yield f"data: {json.dumps(data)}\n\n"
+                last_data = data
+                # 如果进化结束或失败，再发送一次后退出
+                if data.get("status") in ("converged", "failed"):
+                    break
+            await asyncio.sleep(1)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
 
 
 # ========== 启动 ==========

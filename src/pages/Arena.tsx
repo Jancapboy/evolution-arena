@@ -19,10 +19,11 @@ export default function Arena() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sseRef = useRef<EventSource | null>(null);
 
   const speciesId = searchParams.get("id");
 
-  // 轮询物种状态
+  // SSE + 轮询双重保险：SSE推送实时进度，轮询保证完整数据刷新
   useEffect(() => {
     if (!speciesId) {
       setSpecies(null);
@@ -49,15 +50,50 @@ export default function Arena() {
 
     fetchSpecies();
 
-    // 如果正在进化，启动轮询
-    if (!pollRef.current) {
-      pollRef.current = setInterval(fetchSpecies, 2000);
-    }
+    // 启动SSE实时推送
+    const sse = new EventSource(`/api/species/${speciesId}/events`);
+    sseRef.current = sse;
+
+    sse.onmessage = (e) => {
+      try {
+        const payload = JSON.parse(e.data);
+        // 局部更新：只更新能确定的字段，保留完整数据结构
+        setSpecies((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            generation: payload.generation ?? prev.generation,
+            fitness: payload.fitness ?? prev.fitness,
+            status: payload.status ?? prev.status,
+          };
+        });
+
+        // 如果进化结束，停止SSE并刷新完整数据
+        if (payload.status === "converged" || payload.status === "failed") {
+          sse.close();
+          sseRef.current = null;
+          fetchSpecies();
+        }
+      } catch {
+        // 忽略解析失败的消息
+      }
+    };
+
+    sse.onerror = () => {
+      // SSE连接失败时自动重连由浏览器处理，这里什么都不做
+    };
+
+    // 较低频率的轮询作为完整数据刷新备胎（5秒）
+    pollRef.current = setInterval(fetchSpecies, 5000);
 
     return () => {
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
+      }
+      if (sseRef.current) {
+        sseRef.current.close();
+        sseRef.current = null;
       }
     };
   }, [speciesId]);
