@@ -19,7 +19,7 @@ from models import Species, CreateRequest, SpeciesSummary
 from genesis import genesis
 from evolution_loop import (
     run_evolution, save_species, load_species, 
-    list_species, init_db
+    list_species, init_db, delete_species
 )
 
 
@@ -177,6 +177,37 @@ async def list_all_species():
 async def health():
     """健康检查"""
     return {"status": "ok", "service": "evolution-arena"}
+
+
+@app.delete("/api/species/{species_id}")
+async def remove_species(species_id: str):
+    """
+    删除物种——永久删除其基因库和进化历史
+    """
+    success = delete_species(species_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"物种 {species_id} 不存在")
+    return {"deleted": True, "species_id": species_id}
+
+
+@app.get("/api/species/{species_id}/export")
+async def export_species(species_id: str):
+    """
+    导出物种完整基因——返回JSON下载
+    """
+    species = load_species(species_id)
+    if not species:
+        raise HTTPException(status_code=404, detail=f"物种 {species_id} 不存在")
+    
+    return {
+        "species_id": species.species_id,
+        "export_at": datetime.now().isoformat(),
+        "version": "1.0.0",
+        "data": species.model_dump(by_alias=True)
+    }
+
+
+from datetime import datetime
 
 
 # ========== 启动 ==========

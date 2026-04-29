@@ -219,5 +219,16 @@ async def run_evolution(
     )
 
 
+def delete_species(species_id: str) -> bool:
+    """从数据库删除物种"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM species WHERE species_id = ?", (species_id,))
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
+
+
 # 初始化数据库
 init_db()

@@ -13,8 +13,20 @@ import {
   CheckCircle,
   Activity,
   ChevronRight,
+  Download,
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
 import type { SpeciesData } from "@/hooks/useApi";
+import { exportSpecies } from "@/hooks/useApi";
 
 interface EvolutionPanelProps {
   species: SpeciesData | null;
@@ -386,6 +398,125 @@ export default function EvolutionPanel({
                   </>
                 )}
               </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const data = await exportSpecies(species.species_id);
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `${species.species_id}_export.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch (err: any) {
+                    alert("导出失败: " + err.message);
+                  }
+                }}
+                title="导出基因JSON"
+                style={{
+                  padding: "10px 14px",
+                  background: "#14141f",
+                  border: "1px solid #2a2a3e",
+                  borderRadius: 8,
+                  color: "#888",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#00f5ff50";
+                  e.currentTarget.style.color = "#00f5ff";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "#2a2a3e";
+                  e.currentTarget.style.color = "#888";
+                }}
+              >
+                <Download size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Fitness 进化曲线 */}
+        {species && species.history.length > 0 && (
+          <div style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                fontSize: 10,
+                color: "#666",
+                textTransform: "uppercase",
+                letterSpacing: 2,
+                marginBottom: 12,
+                fontWeight: 600,
+              }}
+            >
+              Fitness Curve / 适应度曲线
+            </div>
+            <div
+              style={{
+                background: "#14141f",
+                border: "1px solid #1a1a2e",
+                borderRadius: 10,
+                padding: "12px 8px 8px",
+                height: 200,
+              }}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={species.history}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1a1a2e" />
+                  <XAxis
+                    dataKey="gen"
+                    stroke="#444"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={{ stroke: "#2a2a3e" }}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    stroke="#444"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={{ stroke: "#2a2a3e" }}
+                    tickFormatter={(v) => `${v}`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#0d0d14",
+                      border: "1px solid #2a2a3e",
+                      borderRadius: 6,
+                      fontSize: 11,
+                      color: "#e0e0e0",
+                    }}
+                    itemStyle={{ color: "#00f5ff" }}
+                    formatter={(value: number) => [value.toFixed(1), "Fitness"]}
+                    labelFormatter={(label) => `GEN ${label}`}
+                  />
+                  <ReferenceLine
+                    y={90}
+                    stroke="#00e676"
+                    strokeDasharray="3 3"
+                    strokeOpacity={0.3}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="fitness"
+                    stroke="#00f5ff"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: "#00f5ff", strokeWidth: 0 }}
+                    activeDot={{
+                      r: 5,
+                      fill: "#fff",
+                      stroke: "#00f5ff",
+                      strokeWidth: 2,
+                    }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
         )}

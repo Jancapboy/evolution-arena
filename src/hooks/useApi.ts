@@ -91,3 +91,17 @@ export async function getGenerationHistory(
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function deleteSpecies(species_id: string): Promise<{ deleted: boolean; species_id: string }> {
+  const res = await fetch(`${API_BASE}/species/${species_id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function exportSpecies(species_id: string): Promise<Record<string, any>> {
+  const res = await fetch(`${API_BASE}/species/${species_id}/export`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

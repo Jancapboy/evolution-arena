@@ -13,9 +13,10 @@ import {
   AlertTriangle,
   ArrowRight,
   Plus,
-  Filter,
+  Trash2,
+  Download,
 } from "lucide-react";
-import { listSpecies, type SpeciesData } from "@/hooks/useApi";
+import { listSpecies, deleteSpecies, exportSpecies, type SpeciesData } from "@/hooks/useApi";
 
 export default function SpeciesList() {
   const navigate = useNavigate();
@@ -80,6 +81,33 @@ export default function SpeciesList() {
         return { color: "#ff1744", bg: "#ff174415", icon: <AlertTriangle size={12} /> };
       default:
         return { color: "#00f5ff", bg: "#00f5ff15", icon: <Zap size={12} /> };
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!confirm(`确定删除物种 ${id}？此操作不可恢复。`)) return;
+    try {
+      await deleteSpecies(id);
+      setSpecies((prev) => prev.filter((s) => s.species_id !== id));
+    } catch (err: any) {
+      alert("删除失败: " + err.message);
+    }
+  };
+
+  const handleExport = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      const data = await exportSpecies(id);
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${id}_export.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert("导出失败: " + err.message);
     }
   };
 
@@ -430,7 +458,59 @@ export default function SpeciesList() {
                       GEN {s.generation}
                     </div>
 
-                    <ArrowRight size={14} color="#444" />
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <button
+                        onClick={(e) => handleExport(e, s.species_id)}
+                        title="导出JSON"
+                        style={{
+                          padding: "4px 6px",
+                          background: "transparent",
+                          border: "1px solid #2a2a3e",
+                          borderRadius: 4,
+                          color: "#666",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = "#00f5ff50";
+                          e.currentTarget.style.color = "#00f5ff";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = "#2a2a3e";
+                          e.currentTarget.style.color = "#666";
+                        }}
+                      >
+                        <Download size={12} />
+                      </button>
+                      <button
+                        onClick={(e) => handleDelete(e, s.species_id)}
+                        title="删除"
+                        style={{
+                          padding: "4px 6px",
+                          background: "transparent",
+                          border: "1px solid #2a2a3e",
+                          borderRadius: 4,
+                          color: "#666",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = "#ff174450";
+                          e.currentTarget.style.color = "#ff1744";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = "#2a2a3e";
+                          e.currentTarget.style.color = "#666";
+                        }}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                      <ArrowRight size={14} color="#444" />
+                    </div>
                   </div>
                 </div>
               );
