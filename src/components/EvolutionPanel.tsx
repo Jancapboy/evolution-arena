@@ -33,7 +33,7 @@ interface EvolutionPanelProps {
   onCreate: (goal: string) => Promise<void>;
   onEvolve: (speciesId: string) => Promise<void>;
   isLoading: boolean;
-  liveLog?: string[];
+  liveLog?: { time: number; message: string }[];
 }
 
 export default function EvolutionPanel({
@@ -476,26 +476,31 @@ export default function EvolutionPanel({
                 lineHeight: 1.6,
               }}
             >
-              {liveLog.map((msg, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    color: idx === liveLog.length - 1 ? "#00f5ff" : "#777",
-                    padding: "2px 0",
-                    borderBottom:
-                      idx === liveLog.length - 1 ? "none" : "1px solid #1a1a2e",
-                  }}
-                >
-                  <span style={{ color: "#444", marginRight: 6 }}>
-                    {new Date().toLocaleTimeString("zh-CN", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit",
-                    })}
-                  </span>
-                  {msg}
-                </div>
-              ))}
+              {liveLog.map((entry, idx) => {
+                const isLast = idx === liveLog.length - 1;
+                return (
+                  <div
+                    key={idx}
+                    ref={isLast ? (el) => {
+                      if (el) el.scrollIntoView({ behavior: "smooth", block: "end" });
+                    } : undefined}
+                    style={{
+                      color: isLast ? "#00f5ff" : "#777",
+                      padding: "2px 0",
+                      borderBottom: isLast ? "none" : "1px solid #1a1a2e",
+                    }}
+                  >
+                    <span style={{ color: "#444", marginRight: 6 }}>
+                      {new Date(entry.time).toLocaleTimeString("zh-CN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })}
+                    </span>
+                    {entry.message}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

@@ -19,7 +19,7 @@ export default function Arena() {
   const [species, setSpecies] = useState<SpeciesData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [liveLog, setLiveLog] = useState<string[]>([]);
+  const [liveLog, setLiveLog] = useState<{ time: number; message: string }[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<{
     id: string;
     mind_model: string;
@@ -82,7 +82,7 @@ export default function Arena() {
         // 收集实时日志
         if (payload.message) {
           setLiveLog((prev) => {
-            const next = [...prev, payload.message];
+            const next = [...prev, { time: Date.now(), message: payload.message }];
             return next.slice(-20); // 保留最近20条
           });
         }
