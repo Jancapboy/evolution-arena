@@ -7,8 +7,8 @@ import json
 import aiohttp
 from typing import Optional
 
-DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"
-DEFAULT_MODEL = "deepseek-chat"
+DEEPSEEK_API_URL = os.environ.get("DEEPSEEK_API_URL", "https://api.deepseek.com/chat/completions")
+DEFAULT_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
 
 
 async def call_deepseek(

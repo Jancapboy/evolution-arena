@@ -17,7 +17,45 @@ app.use("/api/trpc/*", async (c) => {
     createContext,
   });
 });
-app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
+
+// 反向代理到Python FastAPI后端（进化系统服务）
+app.all("/api/*", async (c) => {
+  const url = new URL(c.req.url);
+  const target = `${env.pythonApiUrl}${url.pathname}${url.search}`;
+
+  try {
+    const body =
+      c.req.method !== "GET" && c.req.method !== "HEAD"
+        ? await c.req.arrayBuffer()
+        : undefined;
+
+    const res = await fetch(target, {
+      method: c.req.method,
+      headers: {
+        "Content-Type": c.req.header("content-type") || "",
+        Accept: c.req.header("accept") || "application/json",
+      },
+      body,
+    });
+
+    return new Response(res.body, {
+      status: res.status,
+      statusText: res.statusText,
+      headers: {
+        "Content-Type": res.headers.get("content-type") || "application/json",
+      },
+    });
+  } catch (err: any) {
+    return c.json(
+      {
+        error: "Python backend unreachable",
+        detail: err.message,
+        target,
+      },
+      502
+    );
+  }
+});
 
 export default app;
 

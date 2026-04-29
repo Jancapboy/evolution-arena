@@ -83,23 +83,26 @@ def list_species() -> list[dict]:
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT species_id, generation, fitness, status, user_goal, updated_at
+        SELECT species_id, generation, fitness, status, user_goal, updated_at, data
         FROM species ORDER BY updated_at DESC
     """)
     rows = cursor.fetchall()
     conn.close()
     
-    return [
-        {
+    result = []
+    for r in rows:
+        data = json.loads(r[6]) if r[6] else {}
+        history = data.get("history", [])[-20:]  # 只取最近20点用于趋势展示
+        result.append({
             "species_id": r[0],
             "generation": r[1],
             "fitness": r[2],
             "status": r[3],
             "user_goal": r[4],
-            "updated_at": r[5]
-        }
-        for r in rows
-    ]
+            "updated_at": r[5],
+            "history": history
+        })
+    return result
 
 
 # ========== 进化循环 ==========
@@ -217,6 +220,17 @@ async def run_evolution(
         message=f"达到最大代数 {max_generations}",
         converged=True
     )
+
+
+def delete_species(species_id: str) -> bool:
+    """从数据库删除物种"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM species WHERE species_id = ?", (species_id,))
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
 
 
 # 初始化数据库

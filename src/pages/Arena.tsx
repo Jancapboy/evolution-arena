@@ -10,19 +10,33 @@ import {
   createSpecies,
   evolveSpecies,
   getSpecies,
+  checkHealth,
+  listSpecies,
   type SpeciesData,
 } from "@/hooks/useApi";
+import { X, AlertTriangle, Cpu, Thermometer, Wrench, FileText } from "lucide-react";
 
 export default function Arena() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [species, setSpecies] = useState<SpeciesData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liveLog, setLiveLog] = useState<{ time: number; message: string }[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<{
+    id: string;
+    mind_model: string;
+    prompt_gene: string;
+    tools: string[];
+    temperature_gene: number;
+  } | null>(null);
+  const [backendStatus, setBackendStatus] = useState<"connected" | "disconnected" | "checking">("checking");
+  const [allSpecies, setAllSpecies] = useState<Array<{ species_id: string; user_goal: string; status: string }>>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sseRef = useRef<EventSource | null>(null);
 
   const speciesId = searchParams.get("id");
 
-  // 轮询物种状态
+  // SSE + 轮询双重保险：SSE推送实时进度，轮询保证完整数据刷新
   useEffect(() => {
     if (!speciesId) {
       setSpecies(null);
@@ -48,16 +62,61 @@ export default function Arena() {
     };
 
     fetchSpecies();
+    setLiveLog([]);
+    setSelectedAgent(null);
 
-    // 如果正在进化，启动轮询
-    if (!pollRef.current) {
-      pollRef.current = setInterval(fetchSpecies, 2000);
-    }
+    // 启动SSE实时推送
+    const sse = new EventSource(`/api/species/${speciesId}/events`);
+    sseRef.current = sse;
+
+    sse.onmessage = (e) => {
+      try {
+        const payload = JSON.parse(e.data);
+        // 局部更新：只更新能确定的字段，保留完整数据结构
+        setSpecies((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            generation: payload.generation ?? prev.generation,
+            fitness: payload.fitness ?? prev.fitness,
+            status: payload.status ?? prev.status,
+          };
+        });
+
+        // 收集实时日志
+        if (payload.message) {
+          setLiveLog((prev) => {
+            const next = [...prev, { time: Date.now(), message: payload.message }];
+            return next.slice(-20); // 保留最近20条
+          });
+        }
+
+        // 如果进化结束，停止SSE并刷新完整数据
+        if (payload.status === "converged" || payload.status === "failed") {
+          sse.close();
+          sseRef.current = null;
+          fetchSpecies();
+        }
+      } catch {
+        // 忽略解析失败的消息
+      }
+    };
+
+    sse.onerror = () => {
+      // SSE连接失败时自动重连由浏览器处理，这里什么都不做
+    };
+
+    // 较低频率的轮询作为完整数据刷新备胎（5秒）
+    pollRef.current = setInterval(fetchSpecies, 5000);
 
     return () => {
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
+      }
+      if (sseRef.current) {
+        sseRef.current.close();
+        sseRef.current = null;
       }
     };
   }, [speciesId]);
@@ -90,6 +149,28 @@ export default function Arena() {
     }
   }, []);
 
+  // 后端健康检查 —— 8秒一次，不依speciesId
+  useEffect(() => {
+    const check = async () => {
+      try {
+        await checkHealth();
+        setBackendStatus("connected");
+      } catch {
+        setBackendStatus("disconnected");
+      }
+      // 顺便刷新物种列表（用于切换下拉框）
+      try {
+        const list = await listSpecies();
+        setAllSpecies(list);
+      } catch {
+        // 忽略
+      }
+    };
+    check();
+    const id = setInterval(check, 8000);
+    return () => clearInterval(id);
+  }, []);
+
   // 提取薄弱环节
   const weakPoint = (() => {
     if (!species?.latest_diagnosis) return undefined;
@@ -117,6 +198,10 @@ export default function Arena() {
         onCreate={handleCreate}
         onEvolve={handleEvolve}
         isLoading={isLoading}
+        liveLog={liveLog}
+        backendStatus={backendStatus}
+        allSpecies={allSpecies}
+        onSwitchSpecies={(id) => setSearchParams({ id })}
       />
 
       {/* 右侧拓扑画布 */}
@@ -127,6 +212,7 @@ export default function Arena() {
             topology={species.topology}
             weakPoint={weakPoint}
             isEvolving={species.status === "evolving"}
+            onNodeClick={(agent) => setSelectedAgent(agent)}
           />
         ) : (
           <EmptyState />
@@ -177,6 +263,277 @@ export default function Arena() {
             </div>
           </div>
         )}
+        {/* Agent 详情面板 */}
+        {selectedAgent && (
+          <AgentDetailPanel
+            agent={selectedAgent}
+            isWeak={selectedAgent.id === weakPoint}
+            onClose={() => setSelectedAgent(null)}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AgentDetailPanel({
+  agent,
+  isWeak,
+  onClose,
+}: {
+  agent: NonNullable<typeof selectedAgent>;
+  isWeak: boolean;
+  onClose: () => void;
+}) {
+  const getColor = (mindModel: string) => {
+    const map: Record<string, string> = {
+      decomposer: "#00f5ff",
+      retriever: "#7b61ff",
+      generator: "#ff6b35",
+      critic: "#ff1744",
+      validator: "#00e676",
+      optimizer: "#ffd600",
+      pattern_matcher: "#e040fb",
+      temporal_analyst: "#18ffff",
+      integrator: "#69f0ae",
+    };
+    return map[mindModel] || "#888";
+  };
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 20,
+        right: 20,
+        width: 320,
+        maxHeight: "calc(100vh - 40px)",
+        background: "#0d0d14ee",
+        border: `1px solid ${isWeak ? "#ff174460" : "#1a1a2e"}`,
+        borderRadius: 12,
+        padding: "16px 18px",
+        backdropFilter: "blur(16px)",
+        zIndex: 60,
+        overflow: "auto",
+        boxShadow: isWeak ? "0 0 24px #ff174430" : "0 8px 32px #00000060",
+      }}
+    >
+      {/* 头部 */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          marginBottom: 14,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: 10,
+              color: getColor(agent.mind_model),
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: 1,
+              marginBottom: 4,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <Cpu size={12} />
+            {agent.mind_model}
+          </div>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: "#fff",
+              fontFamily: "monospace",
+              wordBreak: "break-all",
+            }}
+          >
+            {agent.id}
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#555",
+            cursor: "pointer",
+            padding: 4,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <X size={16} />
+        </button>
+      </div>
+
+      {/* 弱环节警告 */}
+      {isWeak && (
+        <div
+          style={{
+            background: "#2a0a0a",
+            border: "1px solid #ff174440",
+            borderRadius: 8,
+            padding: "8px 10px",
+            marginBottom: 14,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 11,
+            color: "#ff6b6b",
+          }}
+        >
+          <AlertTriangle size={14} />
+          当前识别为最弱环节，建议优化此 Agent 的 Prompt 或工具集
+        </div>
+      )}
+
+      {/* Prompt Gene */}
+      <div style={{ marginBottom: 14 }}>
+        <div
+          style={{
+            fontSize: 10,
+            color: "#666",
+            textTransform: "uppercase",
+            letterSpacing: 1.5,
+            marginBottom: 6,
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <FileText size={11} />
+          Prompt Gene / 提示基因
+        </div>
+        <div
+          style={{
+            background: "#14141f",
+            border: "1px solid #1a1a2e",
+            borderRadius: 8,
+            padding: "10px 12px",
+            fontSize: 11,
+            color: "#bbb",
+            lineHeight: 1.6,
+            maxHeight: 200,
+            overflow: "auto",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          {agent.prompt_gene}
+        </div>
+      </div>
+
+      {/* Tools */}
+      <div style={{ marginBottom: 14 }}>
+        <div
+          style={{
+            fontSize: 10,
+            color: "#666",
+            textTransform: "uppercase",
+            letterSpacing: 1.5,
+            marginBottom: 6,
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <Wrench size={11} />
+          Tools / 工具集
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {agent.tools.length > 0 ? (
+            agent.tools.map((t) => (
+              <span
+                key={t}
+                style={{
+                  fontSize: 10,
+                  padding: "3px 8px",
+                  background: "#ffffff10",
+                  borderRadius: 4,
+                  color: "#aaa",
+                  border: "1px solid #2a2a3e",
+                }}
+              >
+                {t}
+              </span>
+            ))
+          ) : (
+            <span style={{ fontSize: 11, color: "#555" }}>无工具</span>
+          )}
+        </div>
+      </div>
+
+      {/* Temperature */}
+      <div>
+        <div
+          style={{
+            fontSize: 10,
+            color: "#666",
+            textTransform: "uppercase",
+            letterSpacing: 1.5,
+            marginBottom: 6,
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <Thermometer size={11} />
+          Temperature / 温度基因
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              height: 6,
+              background: "#1a1a2e",
+              borderRadius: 3,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: `${Math.min(agent.temperature_gene * 100, 100)}%`,
+                height: "100%",
+                background:
+                  agent.temperature_gene > 0.7
+                    ? "#ff6b35"
+                    : agent.temperature_gene > 0.4
+                    ? "#ffd600"
+                    : "#00e676",
+                borderRadius: 3,
+                transition: "width 0.3s ease",
+              }}
+            />
+          </div>
+          <span
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#fff",
+              fontFamily: "monospace",
+              minWidth: 40,
+              textAlign: "right",
+            }}
+          >
+            {agent.temperature_gene.toFixed(2)}
+          </span>
+        </div>
       </div>
     </div>
   );

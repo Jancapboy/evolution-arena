@@ -77,6 +77,7 @@ export async function listSpecies(): Promise<
     fitness: number;
     status: string;
     user_goal: string;
+    history: Array<{ gen: number; fitness: number; bottleneck: string }>;
   }>
 > {
   const res = await fetch(`${API_BASE}/species`);
@@ -89,5 +90,35 @@ export async function getGenerationHistory(
 ): Promise<Array<{ gen: number; fitness: number; bottleneck: string }>> {
   const res = await fetch(`${API_BASE}/species/${species_id}/generations`);
   if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteSpecies(species_id: string): Promise<{ deleted: boolean; species_id: string }> {
+  const res = await fetch(`${API_BASE}/species/${species_id}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function exportSpecies(species_id: string): Promise<Record<string, any>> {
+  const res = await fetch(`${API_BASE}/species/${species_id}/export`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function importSpecies(data: Record<string, any>): Promise<{ imported: boolean; species_id: string }> {
+  const res = await fetch(`${API_BASE}/species/import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ data }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function checkHealth(): Promise<{ status: string; service: string }> {
+  const res = await fetch(`${API_BASE}/health`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Health check failed");
   return res.json();
 }

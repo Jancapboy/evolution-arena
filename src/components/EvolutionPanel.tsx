@@ -13,14 +13,30 @@ import {
   CheckCircle,
   Activity,
   ChevronRight,
+  Download,
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
 import type { SpeciesData } from "@/hooks/useApi";
+import { exportSpecies } from "@/hooks/useApi";
 
 interface EvolutionPanelProps {
   species: SpeciesData | null;
   onCreate: (goal: string) => Promise<void>;
   onEvolve: (speciesId: string) => Promise<void>;
   isLoading: boolean;
+  liveLog?: { time: number; message: string }[];
+  backendStatus?: "connected" | "disconnected" | "checking";
+  allSpecies?: Array<{ species_id: string; user_goal: string; status: string }>;
+  onSwitchSpecies?: (speciesId: string) => void;
 }
 
 export default function EvolutionPanel({
@@ -28,6 +44,10 @@ export default function EvolutionPanel({
   onCreate,
   onEvolve,
   isLoading,
+  liveLog = [],
+  backendStatus = "checking",
+  allSpecies = [],
+  onSwitchSpecies,
 }: EvolutionPanelProps) {
   const [goal, setGoal] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -123,9 +143,24 @@ export default function EvolutionPanel({
           >
             EVOLUTION ARENA
           </span>
+          <StatusDot status={backendStatus} />
         </div>
-        <div style={{ fontSize: 11, color: "#555", marginLeft: 30 }}>
-          闭环自进化Agent系统
+        <div style={{ fontSize: 11, color: "#555", marginLeft: 30, display: "flex", alignItems: "center", gap: 8 }}>
+          <span>闭环自进化Agent系统</span>
+          <span style={{ color: "#2a2a3e" }}>|</span>
+          <a
+            href="/"
+            style={{
+              color: "#00f5ff",
+              textDecoration: "none",
+              fontSize: 10,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            ← 物种库
+          </a>
         </div>
       </div>
 
@@ -200,9 +235,36 @@ export default function EvolutionPanel({
                 letterSpacing: 2,
                 marginBottom: 12,
                 fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
               }}
             >
-              Species / 物种
+              <span>Species / 物种</span>
+              {allSpecies.length > 1 && onSwitchSpecies && (
+                <select
+                  value={species.species_id}
+                  onChange={(e) => onSwitchSpecies(e.target.value)}
+                  style={{
+                    background: "#14141f",
+                    border: "1px solid #2a2a3e",
+                    borderRadius: 6,
+                    padding: "4px 8px",
+                    fontSize: 10,
+                    color: "#888",
+                    outline: "none",
+                    cursor: "pointer",
+                    maxWidth: 140,
+                  }}
+                >
+                  {allSpecies.map((s) => (
+                    <option key={s.species_id} value={s.species_id}>
+                      {s.user_goal.substring(0, 20)}
+                      {s.user_goal.length > 20 ? "..." : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div
@@ -312,6 +374,66 @@ export default function EvolutionPanel({
           </div>
         )}
 
+        {/* 结果与诊断 */}
+        {species && (species.latest_result || species.latest_diagnosis) && (
+          <div style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                fontSize: 10,
+                color: "#666",
+                textTransform: "uppercase",
+                letterSpacing: 2,
+                marginBottom: 12,
+                fontWeight: 600,
+              }}
+            >
+              Result / 结果与诊断
+            </div>
+            <div
+              style={{
+                background: "#14141f",
+                border: "1px solid #1a1a2e",
+                borderRadius: 10,
+                padding: "14px 16px",
+              }}
+            >
+              {species.latest_result && (
+                <div style={{ marginBottom: 12 }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: "#555",
+                      marginBottom: 6,
+                      fontWeight: 600,
+                    }}
+                  >
+                    最新结果
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "#bbb",
+                      lineHeight: 1.6,
+                      maxHeight: 120,
+                      overflow: "auto",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      background: "#0d0d14",
+                      borderRadius: 6,
+                      padding: "8px 10px",
+                    }}
+                  >
+                    {species.latest_result}
+                  </div>
+                </div>
+              )}
+              {species.latest_diagnosis && (
+                <DiagnosisBlock diagnosis={species.latest_diagnosis} />
+              )}
+            </div>
+          </div>
+        )}
+
         {/* 进化控制 */}
         {species && (
           <div style={{ marginBottom: 28 }}>
@@ -372,6 +494,186 @@ export default function EvolutionPanel({
                   </>
                 )}
               </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const data = await exportSpecies(species.species_id);
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `${species.species_id}_export.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch (err: any) {
+                    alert("导出失败: " + err.message);
+                  }
+                }}
+                title="导出基因JSON"
+                style={{
+                  padding: "10px 14px",
+                  background: "#14141f",
+                  border: "1px solid #2a2a3e",
+                  borderRadius: 8,
+                  color: "#888",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#00f5ff50";
+                  e.currentTarget.style.color = "#00f5ff";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "#2a2a3e";
+                  e.currentTarget.style.color = "#888";
+                }}
+              >
+                <Download size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 实时日志流 */}
+        {liveLog.length > 0 && (
+          <div style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                fontSize: 10,
+                color: "#666",
+                textTransform: "uppercase",
+                letterSpacing: 2,
+                marginBottom: 12,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <Activity size={12} className="animate-pulse" />
+              Live Log / 实时日志
+            </div>
+            <div
+              style={{
+                background: "#14141f",
+                border: "1px solid #1a1a2e",
+                borderRadius: 10,
+                padding: "10px 12px",
+                maxHeight: 160,
+                overflow: "auto",
+                fontFamily: "monospace",
+                fontSize: 10,
+                lineHeight: 1.6,
+              }}
+            >
+              {liveLog.map((entry, idx) => {
+                const isLast = idx === liveLog.length - 1;
+                return (
+                  <div
+                    key={idx}
+                    ref={isLast ? (el) => {
+                      if (el) el.scrollIntoView({ behavior: "smooth", block: "end" });
+                    } : undefined}
+                    style={{
+                      color: isLast ? "#00f5ff" : "#777",
+                      padding: "2px 0",
+                      borderBottom: isLast ? "none" : "1px solid #1a1a2e",
+                    }}
+                  >
+                    <span style={{ color: "#444", marginRight: 6 }}>
+                      {new Date(entry.time).toLocaleTimeString("zh-CN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })}
+                    </span>
+                    {entry.message}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Fitness 进化曲线 */}
+        {species && species.history.length > 0 && (
+          <div style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                fontSize: 10,
+                color: "#666",
+                textTransform: "uppercase",
+                letterSpacing: 2,
+                marginBottom: 12,
+                fontWeight: 600,
+              }}
+            >
+              Fitness Curve / 适应度曲线
+            </div>
+            <div
+              style={{
+                background: "#14141f",
+                border: "1px solid #1a1a2e",
+                borderRadius: 10,
+                padding: "12px 8px 8px",
+                height: 200,
+              }}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={species.history}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1a1a2e" />
+                  <XAxis
+                    dataKey="gen"
+                    stroke="#444"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={{ stroke: "#2a2a3e" }}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    stroke="#444"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={{ stroke: "#2a2a3e" }}
+                    tickFormatter={(v) => `${v}`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#0d0d14",
+                      border: "1px solid #2a2a3e",
+                      borderRadius: 6,
+                      fontSize: 11,
+                      color: "#e0e0e0",
+                    }}
+                    itemStyle={{ color: "#00f5ff" }}
+                    formatter={(value: number) => [value.toFixed(1), "Fitness"]}
+                    labelFormatter={(label) => `GEN ${label}`}
+                  />
+                  <ReferenceLine
+                    y={90}
+                    stroke="#00e676"
+                    strokeDasharray="3 3"
+                    strokeOpacity={0.3}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="fitness"
+                    stroke="#00f5ff"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: "#00f5ff", strokeWidth: 0 }}
+                    activeDot={{
+                      r: 5,
+                      fill: "#fff",
+                      stroke: "#00f5ff",
+                      strokeWidth: 2,
+                    }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
         )}
@@ -518,6 +820,124 @@ export default function EvolutionPanel({
       >
         闭环自进化系统 v1.0
       </div>
+    </div>
+  );
+}
+
+function DiagnosisBlock({ diagnosis }: { diagnosis: string }) {
+  let parsed: any = null;
+  try {
+    parsed = JSON.parse(diagnosis);
+  } catch {
+    // 不是JSON，当普通文本显示
+  }
+
+  if (parsed && typeof parsed === "object") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {parsed.diagnosis && (
+          <div>
+            <div style={{ fontSize: 10, color: "#555", marginBottom: 4, fontWeight: 600 }}>
+              诊断
+            </div>
+            <div style={{ fontSize: 11, color: "#aaa", lineHeight: 1.5 }}>
+              {parsed.diagnosis}
+            </div>
+          </div>
+        )}
+        {parsed.weak_point && (
+          <div
+            style={{
+              background: "#2a0a0a",
+              border: "1px solid #ff174430",
+              borderRadius: 6,
+              padding: "6px 8px",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 11,
+              color: "#ff6b6b",
+            }}
+          >
+            <AlertTriangle size={12} />
+            薄弱环节: {parsed.weak_point}
+          </div>
+        )}
+        {parsed.suggestion && (
+          <div>
+            <div style={{ fontSize: 10, color: "#555", marginBottom: 4, fontWeight: 600 }}>
+              建议
+            </div>
+            <div style={{ fontSize: 11, color: "#888", lineHeight: 1.5 }}>
+              {parsed.suggestion}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 10, color: "#555", marginBottom: 4, fontWeight: 600 }}>
+        诊断信息
+      </div>
+      <div
+        style={{
+          fontSize: 11,
+          color: "#aaa",
+          lineHeight: 1.5,
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-word",
+        }}
+      >
+        {diagnosis}
+      </div>
+    </div>
+  );
+}
+
+function StatusDot({ status }: { status: "connected" | "disconnected" | "checking" }) {
+  const color =
+    status === "connected"
+      ? "#00e676"
+      : status === "disconnected"
+      ? "#ff1744"
+      : "#ffd600";
+  const label =
+    status === "connected"
+      ? "后端在线"
+      : status === "disconnected"
+      ? "后端离线"
+      : "检测中";
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 5,
+        marginLeft: "auto",
+        padding: "2px 8px",
+        background: `${color}15`,
+        border: `1px solid ${color}40`,
+        borderRadius: 12,
+      }}
+      title={label}
+    >
+      <span
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          background: color,
+          boxShadow: `0 0 6px ${color}`,
+          animation: status === "checking" ? "pulse 1.5s infinite" : undefined,
+        }}
+      />
+      <span style={{ fontSize: 9, color, fontWeight: 600, letterSpacing: 0.5 }}>
+        {label}
+      </span>
     </div>
   );
 }
