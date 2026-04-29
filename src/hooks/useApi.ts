@@ -77,6 +77,7 @@ export async function listSpecies(): Promise<
     fitness: number;
     status: string;
     user_goal: string;
+    history: Array<{ gen: number; fitness: number; bottleneck: string }>;
   }>
 > {
   const res = await fetch(`${API_BASE}/species`);

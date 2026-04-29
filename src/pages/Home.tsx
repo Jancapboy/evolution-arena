@@ -412,6 +412,14 @@ export default function SpeciesList() {
                     {s.user_goal}
                   </div>
 
+                  {/* 迷你趋势 */}
+                  {s.history.length > 1 && (
+                    <MiniSparkline
+                      history={s.history}
+                      color={getFitnessColor(s.fitness)}
+                    />
+                  )}
+
                   {/* 底部数据 */}
                   <div
                     style={{
@@ -529,6 +537,66 @@ export default function SpeciesList() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function MiniSparkline({
+  history,
+  color,
+}: {
+  history: Array<{ gen: number; fitness: number }>;
+  color: string;
+}) {
+  const points = history;
+  if (points.length < 2) return null;
+
+  const width = 280;
+  const height = 32;
+  const padding = 2;
+
+  const minF = Math.min(...points.map((p) => p.fitness), 0);
+  const maxF = Math.max(...points.map((p) => p.fitness), 100);
+  const range = maxF - minF || 1;
+
+  const getX = (i: number) =>
+    padding + (i / (points.length - 1)) * (width - padding * 2);
+  const getY = (v: number) =>
+    height - padding - ((v - minF) / range) * (height - padding * 2);
+
+  const pathD = points
+    .map((p, i) => `${i === 0 ? "M" : "L"} ${getX(i)} ${getY(p.fitness)}`)
+    .join(" ");
+
+  const areaD =
+    pathD +
+    ` L ${getX(points.length - 1)} ${height} L ${getX(0)} ${height} Z`;
+
+  return (
+    <div style={{ marginBottom: 10, marginTop: -4 }}>
+      <svg
+        width="100%"
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+        style={{ overflow: "visible" }}
+      >
+        <defs>
+          <linearGradient id={`grad-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={areaD} fill={`url(#grad-${color.replace("#", "")})`} stroke="none" />
+        <path
+          d={pathD}
+          fill="none"
+          stroke={color}
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
     </div>
   );
 }
