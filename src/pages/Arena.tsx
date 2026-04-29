@@ -11,6 +11,7 @@ import {
   evolveSpecies,
   getSpecies,
   checkHealth,
+  listSpecies,
   type SpeciesData,
 } from "@/hooks/useApi";
 import { X, AlertTriangle, Cpu, Thermometer, Wrench, FileText } from "lucide-react";
@@ -29,6 +30,7 @@ export default function Arena() {
     temperature_gene: number;
   } | null>(null);
   const [backendStatus, setBackendStatus] = useState<"connected" | "disconnected" | "checking">("checking");
+  const [allSpecies, setAllSpecies] = useState<Array<{ species_id: string; user_goal: string; status: string }>>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const sseRef = useRef<EventSource | null>(null);
 
@@ -156,6 +158,13 @@ export default function Arena() {
       } catch {
         setBackendStatus("disconnected");
       }
+      // 顺便刷新物种列表（用于切换下拉框）
+      try {
+        const list = await listSpecies();
+        setAllSpecies(list);
+      } catch {
+        // 忽略
+      }
     };
     check();
     const id = setInterval(check, 8000);
@@ -191,6 +200,8 @@ export default function Arena() {
         isLoading={isLoading}
         liveLog={liveLog}
         backendStatus={backendStatus}
+        allSpecies={allSpecies}
+        onSwitchSpecies={(id) => setSearchParams({ id })}
       />
 
       {/* 右侧拓扑画布 */}

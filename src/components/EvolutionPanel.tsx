@@ -35,6 +35,8 @@ interface EvolutionPanelProps {
   isLoading: boolean;
   liveLog?: { time: number; message: string }[];
   backendStatus?: "connected" | "disconnected" | "checking";
+  allSpecies?: Array<{ species_id: string; user_goal: string; status: string }>;
+  onSwitchSpecies?: (speciesId: string) => void;
 }
 
 export default function EvolutionPanel({
@@ -44,6 +46,8 @@ export default function EvolutionPanel({
   isLoading,
   liveLog = [],
   backendStatus = "checking",
+  allSpecies = [],
+  onSwitchSpecies,
 }: EvolutionPanelProps) {
   const [goal, setGoal] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -231,9 +235,36 @@ export default function EvolutionPanel({
                 letterSpacing: 2,
                 marginBottom: 12,
                 fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
               }}
             >
-              Species / 物种
+              <span>Species / 物种</span>
+              {allSpecies.length > 1 && onSwitchSpecies && (
+                <select
+                  value={species.species_id}
+                  onChange={(e) => onSwitchSpecies(e.target.value)}
+                  style={{
+                    background: "#14141f",
+                    border: "1px solid #2a2a3e",
+                    borderRadius: 6,
+                    padding: "4px 8px",
+                    fontSize: 10,
+                    color: "#888",
+                    outline: "none",
+                    cursor: "pointer",
+                    maxWidth: 140,
+                  }}
+                >
+                  {allSpecies.map((s) => (
+                    <option key={s.species_id} value={s.species_id}>
+                      {s.user_goal.substring(0, 20)}
+                      {s.user_goal.length > 20 ? "..." : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div
